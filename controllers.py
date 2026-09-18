@@ -302,9 +302,9 @@ class AppController:
     def imprimir_boleto(self, aposta: Aposta):
         try:
             caminho = self.controller.imprimir_boleto(aposta)
-            self.app._mostrar_toast(f"Boleto aberto: {caminho}")
+            self.app._mostrar_toast(f"Registro aberto: {caminho}")
         except Exception as e:
-            self.app._mostrar_toast(f"Erro ao gerar boleto: {str(e)}")
+            self.app._mostrar_toast(f"Erro ao gerar registro: {str(e)}")
 
     def exportar_csv(self):
         try:

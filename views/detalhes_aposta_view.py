@@ -244,7 +244,7 @@ class DetalhesApostaView:
         btn_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
         btn_frame.pack(fill="x")
 
-        ctk.CTkButton(btn_frame, text="🖨️ Imprimir Boleto",
+        ctk.CTkButton(btn_frame, text="🖨️ Imprimir Registro",
                       command=lambda: self.controller.imprimir_boleto(self.aposta),
                       fg_color=Cores.DOCUMENTO, hover_color="#563389",
                       height=40, width=200).pack(side="left", padx=(0, 10))

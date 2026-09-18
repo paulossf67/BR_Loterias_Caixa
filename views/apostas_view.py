@@ -134,7 +134,7 @@ class ApostasView:
         btn_frame.pack(fill="x", padx=10, pady=(0, 8))
         btn_frame.pack_propagate(False)
 
-        ctk.CTkButton(btn_frame, text="🖨️ Boleto", width=80,
+        ctk.CTkButton(btn_frame, text="🖨️ Registro", width=80,
                         command=lambda a=aposta: self.controller.imprimir_boleto(a),
                         fg_color="#007bff", hover_color="#0056b3").pack(
             side="left", padx=5)

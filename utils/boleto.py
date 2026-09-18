@@ -35,7 +35,7 @@ def gerar_boleto_html(aposta, jogador=None) -> str:
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Boleto - {nome_loteria}</title>
+<title>Registro de controle - {nome_loteria}</title>
 <style>
 @page {{
     size: A5 portrait;
@@ -63,19 +63,35 @@ body {{
 }}
 
 .boleto::before {{
-    content: 'COMPROVANTE DE APOSTA';
+    content: 'NÃO É APOSTA OFICIAL';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) rotate(-35deg);
     font-size: 42px;
     font-weight: bold;
-    color: rgba(0, 48, 135, 0.035);
+    color: rgba(198, 40, 40, 0.09);
     white-space: nowrap;
     pointer-events: none;
     z-index: 0;
     letter-spacing: 6px;
 }}
+
+.aviso-oficial {{
+    margin: 10px 15px 0;
+    padding: 9px 12px;
+    background: #fdecea;
+    border: 2px solid #c62828;
+    border-radius: 6px;
+    color: #8e1b1b;
+    font-size: 10.5px;
+    line-height: 1.45;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}}
+
+.aviso-oficial strong {{ font-size: 12px; }}
 
 .header-bar {{
     height: 8px;
@@ -428,7 +444,7 @@ body {{
     }}
 
     .boleto::before {{
-        color: rgba(0, 48, 135, 0.025);
+        color: rgba(198, 40, 40, 0.07);
     }}
 
     .btn-print {{
@@ -478,10 +494,18 @@ body {{
     <div class="header-bar"></div>
 
     <div class="header">
-        <div class="caixa-logo">Caixa Economica Federal</div>
+        <div class="caixa-logo">Controle pessoal &bull; sem vínculo com a Caixa</div>
         <h1>{nome_loteria.upper()}</h1>
-        <h2>COMPROVANTE DE APOSTA</h2>
+        <h2>REGISTRO DE CONTROLE PESSOAL</h2>
         <div class="concurso">Concurso <span>#{aposta.data_sorteio}</span></div>
+    </div>
+
+    <div class="aviso-oficial">
+        <strong>&#9888; ESTE DOCUMENTO NÃO É UMA APOSTA NEM UM BILHETE DA CAIXA.</strong><br>
+        Ele apenas registra, para seu controle, os números escolhidos neste sistema. Não vale como
+        jogo, não concorre a prêmios e não pode ser apresentado na lotérica.<br>
+        Para concorrer, faça a aposta na lotérica, no app Loterias CAIXA ou em
+        www.loteriasonline.caixa.gov.br.
     </div>
 
     <div class="content">
@@ -540,46 +564,23 @@ body {{
         </div>
 
         <div class="barcode">
-            <div class="barcode-label">Codigo de Barras</div>
-            <div class="barcode-visual">
-                <div class="bar thin"></div><div class="bar thick"></div><div class="bar space"></div>
-                <div class="bar medium"></div><div class="bar thin"></div><div class="bar space-thin"></div>
-                <div class="bar thick"></div><div class="bar thin"></div><div class="bar space"></div>
-                <div class="bar medium"></div><div class="bar thin"></div><div class="bar thick"></div>
-                <div class="bar space-thin"></div><div class="bar thin"></div><div class="bar medium"></div>
-                <div class="bar space"></div><div class="bar thick"></div><div class="bar thin"></div>
-                <div class="bar medium"></div><div class="bar thin"></div><div class="bar space-thin"></div>
-                <div class="bar thin"></div><div class="bar thick"></div><div class="bar thin"></div>
-                <div class="bar space"></div><div class="bar medium"></div><div class="bar thin"></div>
-                <div class="bar thick"></div><div class="bar thin"></div><div class="bar space"></div>
-                <div class="bar thin"></div><div class="bar medium"></div><div class="bar thick"></div>
-                <div class="bar space-thin"></div><div class="bar thin"></div><div class="bar medium"></div>
-                <div class="bar thin"></div><div class="bar space"></div><div class="bar thick"></div>
-                <div class="bar thin"></div><div class="bar medium"></div><div class="bar thin"></div>
-                <div class="bar space-thin"></div><div class="bar thick"></div><div class="bar thin"></div>
-                <div class="bar thin"></div><div class="bar medium"></div><div class="bar space"></div>
-                <div class="bar thin"></div><div class="bar thick"></div><div class="bar thin"></div>
-                <div class="bar medium"></div><div class="bar thin"></div><div class="bar thick"></div>
-                <div class="bar space"></div><div class="bar thin"></div><div class="bar medium"></div>
-                <div class="bar thick"></div><div class="bar thin"></div><div class="bar space-thin"></div>
-                <div class="bar thin"></div><div class="bar thick"></div><div class="bar thin"></div>
-            </div>
+            <div class="barcode-label">Código interno de controle (não é código de barras oficial)</div>
             <div class="barcode-text">{barcode_code}</div>
         </div>
 
         <div class="conferir-section">
-            <div class="title">Conferir Resultado</div>
+            <div class="title">Conferir o resultado oficial</div>
             <div class="url">www.loterias.caixa.gov.br</div>
         </div>
     </div>
 
     <div class="footer">
-        <div class="comprovante-title">Comprovante de Aposta</div>
+        <div class="comprovante-title">Registro de controle pessoal &mdash; sem valor como aposta</div>
         <p>Apostador: {jogador_nome} | ID: {aposta.id:06d}</p>
         <p>Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
         <div class="aviso">
-            Este comprovante nao e o boleto de pagamento e sim a confirmacao da aposta realizada.
-            <br>Mantenha este comprovante ate o resultado do sorteio.
+            Este registro NÃO é comprovante de aposta e não tem valor perante a Caixa Econômica Federal.
+            <br>Guarde o bilhete oficial emitido pela lotérica ou pelo app/site da Caixa: só ele vale para receber prêmios.
             <br>Verifique os resultados em www.loterias.caixa.gov.br
         </div>
         <div class="sistema">
@@ -587,7 +588,7 @@ body {{
         </div>
     </div>
 
-    <button class="btn-print" onclick="window.print()">Imprimir Boleto</button>
+    <button class="btn-print" onclick="window.print()">Imprimir registro</button>
 </div>
 </body>
 </html>"""

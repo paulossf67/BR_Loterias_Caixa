@@ -10,3 +10,7 @@ __pycache__/
 boletos/
 data/backups/
 .pytest_cache/
+
+build/
+dist/
+*.spec
