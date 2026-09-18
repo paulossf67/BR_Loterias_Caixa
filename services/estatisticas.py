@@ -49,3 +49,44 @@ def financeiro_por_mes(apostas: Iterable) -> List[Tuple[str, float, float]]:
         inv[chave] += a.valor
         pre[chave] += a.premio
     return [(f"{k[5:]}/{k[:4]}", inv[k], pre[k]) for k in sorted(inv)]
+
+
+MODOS_GERACAO = {
+    "Aleatório": "aleatorio",
+    "Mais sorteados": "quentes",
+    "Mais atrasados": "atrasados",
+    "Misto (sorteados + atrasados)": "misto",
+}
+
+
+def _sortear_ponderado(pesos: Dict[int, float], qtd: int, rng) -> List[int]:
+    """Sorteio sem reposição; números com peso maior têm mais chance."""
+    pesos, escolhidos = dict(pesos), []
+    for _ in range(min(qtd, len(pesos))):
+        n = rng.choices(list(pesos), weights=list(pesos.values()))[0]
+        escolhidos.append(n)
+        del pesos[n]
+    return escolhidos
+
+
+def gerar_numeros(resultados: Iterable, tipo: str, qtd: int, modo: str = "aleatorio",
+                  rng=None) -> List[int]:
+    """Gera uma aposta. Os modos estatísticos apenas ponderam o sorteio: continua sendo
+    aleatório, e nenhum número tem chance real maior de sair no próximo concurso."""
+    import random
+    rng = rng or random
+    resultados = list(resultados)
+    freq = frequencia_numeros(resultados, tipo)
+    if modo == "aleatorio" or not any(freq.values()):
+        return sorted(rng.sample(list(freq), qtd))
+    atraso = atraso_numeros(resultados, tipo)
+    quentes = {n: f + 1 for n, f in freq.items()}
+    atrasados = {n: a + 1 for n, a in atraso.items()}
+    if modo == "quentes":
+        return sorted(_sortear_ponderado(quentes, qtd, rng))
+    if modo == "atrasados":
+        return sorted(_sortear_ponderado(atrasados, qtd, rng))
+    metade = qtd // 2
+    escolhidos = _sortear_ponderado(quentes, metade, rng)
+    resto = {n: p for n, p in atrasados.items() if n not in escolhidos}
+    return sorted(escolhidos + _sortear_ponderado(resto, qtd - metade, rng))

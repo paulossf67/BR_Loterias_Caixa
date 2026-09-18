@@ -6,6 +6,8 @@ import customtkinter as ctk
 from cores import Cores
 from services.api_service import LOTERIAS
 from services.regras import REGRAS
+from services import estatisticas as est
+from services.estatisticas import MODOS_GERACAO
 from utils.helpers import validar_numeros
 
 LOTERIAS_NOME = {k: v["nome"] for k, v in LOTERIAS.items()}
@@ -37,6 +39,19 @@ class NovaApostaMixin:
                                                  width=300, command=self._on_loteria_selecionada)
         self.cmb_loteria.pack(pady=(0, 15), padx=15, fill="x")
         self.cmb_loteria.set("mega-sena")
+
+        # Modo de geração
+        frame_modo = ctk.CTkFrame(scroll, fg_color="#f8f9fa", corner_radius=10)
+        frame_modo.pack(fill="x", padx=20, pady=5)
+        ctk.CTkLabel(frame_modo, text="Como gerar os números?",
+                     font=("Arial", 14, "bold")).pack(pady=(15, 5), anchor="w", padx=15)
+        self.cmb_modo = ctk.CTkComboBox(frame_modo, values=list(MODOS_GERACAO), width=300,
+                                        state="readonly", command=lambda v: self.gerar_numeros())
+        self.cmb_modo.set("Aleatório")
+        self.cmb_modo.pack(pady=(0, 5), padx=15, anchor="w")
+        ctk.CTkLabel(frame_modo, text="Os modos estatísticos só dão mais peso ao sorteio; "
+                     "todo número continua com a mesma chance real de sair.",
+                     font=("Arial", 11), text_color="gray").pack(pady=(0, 15), padx=15, anchor="w")
 
         # Seleção de números
         frame_numeros = ctk.CTkFrame(scroll, fg_color="#f8f9fa", corner_radius=10)
@@ -97,9 +112,8 @@ class NovaApostaMixin:
     def gerar_numeros(self):
         tipo = self.cmb_loteria.get() if hasattr(self, 'cmb_loteria') else "mega-sena"
         qtd, maximo = NUMEROS_POR_LOTERIA.get(tipo, (6, 60))
-        numeros = []
-        import random
-        numeros = sorted(random.sample(range(1, maximo + 1), qtd))
+        modo = MODOS_GERACAO.get(self.cmb_modo.get(), "aleatorio") if hasattr(self, "cmb_modo") else "aleatorio"
+        numeros = est.gerar_numeros(self.controller.get_resultados(), tipo, qtd, modo)
 
         for widget in self.numeros_frame.winfo_children():
             widget.destroy()

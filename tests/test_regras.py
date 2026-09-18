@@ -152,3 +152,21 @@ def test_desdobramento_soma_combinacoes():
     # aposta simples continua igual
     simples = Aposta(tipo_loteria="mega-sena", numeros=[1, 2, 3, 4, 5, 6])
     assert regras.premio_da_aposta(r, simples, 5) == 1000.0
+
+
+def test_gerar_numeros_modos():
+    import random
+    from services import estatisticas as est
+
+    rs = [res(concurso=i, nums=(1, 2, 3, 4, 5, 6)) for i in range(1, 30)]
+    rng = random.Random(1)
+    for modo in est.MODOS_GERACAO.values():
+        nums = est.gerar_numeros(rs, "mega-sena", 6, modo, rng)
+        assert regras.validar_aposta("mega-sena", nums, 5.0)[0], modo
+    # sem histórico cai no aleatório
+    assert len(est.gerar_numeros([], "mega-sena", 6, "quentes", rng)) == 6
+    # ponderação favorece os mais sorteados
+    hits = sum(n <= 6 for _ in range(300) for n in est.gerar_numeros(rs, "mega-sena", 6, "quentes", rng))
+    assert hits / 300 > 6 * 0.3
+    # lotomania inclui o 0 no universo
+    assert regras.validar_aposta("lotomania", est.gerar_numeros([], "lotomania", 50), 3.0)[0]
