@@ -117,8 +117,7 @@ Colunas novas são adicionadas automaticamente em bancos existentes.
 ## ⚠️ Observações
 
 - O prêmio só é calculado quando o resultado tem o rateio por faixa; resultados sincronizados antes dessa versão ficam com prêmio 0 até serem buscados novamente.
-- Aposta com mais números que o mínimo (desdobramento) é conferida pelos acertos totais, sem calcular as combinações premiadas.
-- O executável (`build.ps1`) não foi testado neste ambiente.
+- Desdobramento (mais números que o mínimo): o prêmio soma cada combinação premiada contida na aposta. Na Dupla Sena só o 1º sorteio é considerado.
 
 ## 📝 Licença
 

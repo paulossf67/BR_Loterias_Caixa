@@ -140,3 +140,15 @@ def test_bolao_divide_premio_e_teimosinha(tmp_path):
     assert a101.premio == 200.0  # 800 dividido em 4 cotas
     with pytest.raises(ValueError):
         c.add_aposta("mega-sena", [1, 2, 3, 4, 5, 6], 5.0, cotas=0)
+
+
+def test_desdobramento_soma_combinacoes():
+    # 7 números na Mega, 6 acertos entre eles: 1 sena + 6 quinas
+    r = res(premiacao={4: 100.0, 5: 1000.0, 6: 50000.0})
+    a = Aposta(tipo_loteria="mega-sena", numeros=[1, 2, 3, 4, 5, 6, 7])
+    assert regras.premio_da_aposta(r, a, 6) == 50000.0 + 6 * 1000.0
+    # 5 acertos entre 7: C(5,5)*C(2,1)=2 quinas + C(5,4)*C(2,2)=5 quadras
+    assert regras.premio_da_aposta(r, a, 5) == 2 * 1000.0 + 5 * 100.0
+    # aposta simples continua igual
+    simples = Aposta(tipo_loteria="mega-sena", numeros=[1, 2, 3, 4, 5, 6])
+    assert regras.premio_da_aposta(r, simples, 5) == 1000.0

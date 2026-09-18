@@ -1,5 +1,6 @@
 """Regras de negócio das loterias: validação, faixas de premiação e conferência."""
 import re
+from math import comb
 from datetime import datetime
 from typing import Iterable, List, Optional, Tuple
 
@@ -36,8 +37,21 @@ def calcular_premio(resultado, acertos: int) -> float:
 
 
 def premio_da_aposta(resultado, aposta, acertos: int) -> float:
-    """Prêmio da aposta; em bolão, a parte que cabe a esta cota."""
-    return calcular_premio(resultado, acertos) / max(getattr(aposta, "cotas", 1) or 1, 1)
+    """Prêmio da aposta; em bolão, a parte que cabe a esta cota.
+
+    Em desdobramento (mais números que o mínimo), soma o prêmio de cada combinação
+    de tamanho mínimo contida na aposta: com h acertos entre k números, há
+    C(h, a) * C(k-h, m-a) combinações com exatamente `a` acertos.
+    """
+    cotas = max(getattr(aposta, "cotas", 1) or 1, 1)
+    regra = REGRAS.get(resultado.tipo_loteria)
+    k = len(getattr(aposta, "numeros", []) or [])
+    if regra and k > regra["min"]:
+        m = regra["min"]
+        total = sum(comb(acertos, a) * comb(k - acertos, m - a) * calcular_premio(resultado, a)
+                    for a in regra["premiam"] if a <= acertos and m - a <= k - acertos)
+        return total / cotas
+    return calcular_premio(resultado, acertos) / cotas
 
 
 def _parse_data(texto: str) -> Optional[datetime]:
