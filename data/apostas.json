@@ -1,0 +1,106 @@
+[
+  {
+    "id": 1,
+    "tipo_loteria": "lotofacil",
+    "data_aposta": "27/08/2026",
+    "numeros": [
+      1,
+      6,
+      7,
+      8,
+      9,
+      10,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      22
+    ],
+    "valor": 34.76,
+    "data_sorteio": "27/08/2026",
+    "acertos": 12,
+    "premio": 0.0,
+    "conferência_feita": true
+  },
+  {
+    "id": 2,
+    "tipo_loteria": "dupla-sena",
+    "data_aposta": "17/09/2026",
+    "numeros": [
+      9,
+      11,
+      30,
+      35,
+      40,
+      54
+    ],
+    "valor": 45.58,
+    "data_sorteio": "17/09/2026",
+    "acertos": 4,
+    "premio": 455.8,
+    "conferência_feita": true
+  },
+  {
+    "id": 3,
+    "tipo_loteria": "timemania",
+    "data_aposta": "11/09/2026",
+    "numeros": [
+      4,
+      7,
+      11,
+      18,
+      24,
+      34,
+      42,
+      49,
+      55,
+      60
+    ],
+    "valor": 24.1,
+    "data_sorteio": "11/09/2026",
+    "acertos": 5,
+    "premio": 1205.0,
+    "conferência_feita": true
+  },
+  {
+    "id": 4,
+    "tipo_loteria": "dia-de-sorte",
+    "data_aposta": "22/08/2026",
+    "numeros": [
+      9,
+      13,
+      14,
+      25,
+      27,
+      29,
+      31
+    ],
+    "valor": 6.39,
+    "data_sorteio": "22/08/2026",
+    "acertos": 0,
+    "premio": 0.0,
+    "conferência_feita": true
+  },
+  {
+    "id": 5,
+    "tipo_loteria": "dupla-sena",
+    "data_aposta": "24/08/2026",
+    "numeros": [
+      4,
+      5,
+      15,
+      23,
+      35,
+      42
+    ],
+    "valor": 47.97,
+    "data_sorteio": "24/08/2026",
+    "acertos": 0,
+    "premio": 0.0,
+    "conferência_feita": true
+  }
+]
