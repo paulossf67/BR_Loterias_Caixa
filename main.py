@@ -2,12 +2,12 @@
 Sistema de Controle de Apostas e Resultados das Loterias da Caixa.
 Interface gráfica com CustomTkinter.
 """
-import json
 import logging
 import random
 import threading
 import traceback
 from datetime import datetime
+from typing import List, Optional
 
 import customtkinter as ctk
 
@@ -50,7 +50,7 @@ class App(ctk.CTk):
         super().__init__()
         self.controller = AppController(self)
         self.current_view_name = "home"
-        self.tela_nova_aposta_widgets = {}
+        self.jogador_atual = None
 
         self.title("🎰  Loterias da Caixa - Sistema de Controle")
         self.geometry("1200x750")
@@ -60,7 +60,6 @@ class App(ctk.CTk):
             pass
 
         self.report_callback_exception = self._handle_callback_exception
-        self.usuario_nome = "Usuário"
 
         self._montar_cabecalho()
         self._montar_rodape()
@@ -87,20 +86,20 @@ class App(ctk.CTk):
         self.lbl_hora.pack(side="left", padx=20)
 
         self.lbl_titulo = ctk.CTkLabel(self.header, text="🎰  LOTERIAS DA CAIXA",
-                                        font=("Arial", 20, "bold"), text_color="white")
+                                             font=("Arial", 20, "bold"), text_color="white")
         self.lbl_titulo.place(relx=0.5, rely=0.5, anchor="center")
 
         self.lbl_data = ctk.CTkLabel(self.header, text="", font=("Arial", 16), text_color="white")
         self.lbl_data.pack(side="right", padx=20)
 
         self.entry_global_search = ctk.CTkEntry(self.header, placeholder_text="Busca rápida",
-                                                 width=280, fg_color="white",
-                                                 text_color="#333333", border_width=0)
+                                                        width=280, fg_color="white",
+                                                        text_color="#333333", border_width=0)
         self.entry_global_search.pack(side="right", padx=10)
         self.entry_global_search.bind("<Return>", self._busca_global)
 
         btn_busca = ctk.CTkButton(self.header, text="🔍", width=40, command=self._busca_global,
-                                   fg_color="#14508c", hover_color="#0d3c6b", text_color="white")
+                                       fg_color="#14508c", hover_color="#0d3c6b", text_color="white")
         btn_busca.pack(side="right")
 
     def _busca_global(self, event=None):
@@ -121,15 +120,15 @@ class App(ctk.CTk):
         self.lbl_status_sistema.pack(side="left", padx=20)
 
         self.lbl_status_conexao = ctk.CTkLabel(self.footer, text="Verificando...",
-                                                font=("Arial", 12, "bold"))
+                                                     font=("Arial", 12, "bold"))
         self.lbl_status_conexao.pack(side="left", padx=20)
 
         self.lbl_creditos = ctk.CTkLabel(self.footer, text="Loterias da Caixa v1.0",
-                                           font=("Arial", 12))
+                                                font=("Arial", 12))
         self.lbl_creditos.pack(side="right", padx=20)
 
     # ------------------------------------------------------------------ #
-    # LAYOUT PRINCIPAL (sidebar + conteúdo)
+    # LAYOUT PRINCIPAL
     # ------------------------------------------------------------------ #
     def _montar_layout_principal(self):
         self.main_container = ctk.CTkFrame(self, corner_radius=0)
@@ -139,7 +138,7 @@ class App(ctk.CTk):
         self.sidebar_frame.pack(side="left", fill="y")
 
         self.content_frame = ctk.CTkFrame(self.main_container, corner_radius=0,
-                                           fg_color="transparent")
+                                                 fg_color="transparent")
         self.content_frame.pack(side="right", fill="both", expand=True, padx=20, pady=20)
 
         ctk.CTkLabel(self.sidebar_frame, text="MENU PRINCIPAL", font=("Arial", 13, "bold"),
@@ -162,20 +161,24 @@ class App(ctk.CTk):
         self.btn_conferencia.pack(pady=5, padx=20, fill="x")
 
         self.btn_estatisticas = ctk.CTkButton(self.sidebar_frame, text="📊  Estatísticas", anchor="w",
-                                               command=self.abrir_estatisticas)
+                                                command=self.abrir_estatisticas)
         self.btn_estatisticas.pack(pady=5, padx=20, fill="x")
 
+        self.btn_jogador = ctk.CTkButton(self.sidebar_frame, text="👤  Cadastro", anchor="w",
+                                            command=self.abrir_cadastro)
+        self.btn_jogador.pack(pady=5, padx=20, fill="x")
+
         self.btn_sincronizar = ctk.CTkButton(self.sidebar_frame, text="🔄  Sincronizar", anchor="w",
-                                              command=self.controller.sync_and_refresh,
+                                              command=self._sync_handler,
                                               fg_color="#28a745", hover_color="#1e7e34")
         self.btn_sincronizar.pack(pady=5, padx=20, fill="x")
 
-        self.btn_sair = ctk.CTkButton(self.sidebar_frame, text="🚪  Sair do Sistema", anchor="w",
+        self.btn_sair = ctk.CTkButton(self.sidebar_frame, text="🚪  Sair", anchor="w",
                                        command=self.quit, fg_color=Cores.PERIGO, hover_color="#a83232")
         self.btn_sair.pack(side="bottom", pady=20, padx=20, fill="x")
 
     # ------------------------------------------------------------------ #
-    # NAVEGAÇÃO ENTRE TELAS
+    # NAVEGAÇÃO
     # ------------------------------------------------------------------ #
     def limpar_conteudo(self):
         for widget in self.content_frame.winfo_children():
@@ -204,6 +207,28 @@ class App(ctk.CTk):
             botoes[btn_name].configure(fg_color=cor_ativa)
 
     # ------------------------------------------------------------------ #
+    # HANDLERS
+    # ------------------------------------------------------------------ #
+    def _sync_handler(self):
+        with threading.Thread(target=self._sync_worker, daemon=True):
+            threading.Thread(target=self._sync_worker, daemon=True).start()
+
+    def _sync_worker(self):
+        result = self.controller.sync_and_refresh()
+        self.after(0, self._atualizar_apos_sync, result)
+
+    def _atualizar_apos_sync(self, result):
+        self.voltar_inicio()
+        self._mostrar_toast(f"✅ Sync: {result['sync_count']} novos resultados | {len(result['errors'])} erros")
+
+    def _mostrar_toast(self, mensagem: str):
+        toast = ctk.CTkLabel(self.content_frame, text=mensagem,
+                                  font=("Arial", 13, "bold"), text_color="white",
+                                  fg_color=Cores.SUCESSO, corner_radius=8, padx=15, pady=10)
+        toast.place(relx=0.5, rely=0.5, anchor="center")
+        self.after(2000, lambda: toast.destroy())
+
+    # ------------------------------------------------------------------ #
     # TELAS
     # ------------------------------------------------------------------ #
     def voltar_inicio(self):
@@ -214,58 +239,59 @@ class App(ctk.CTk):
         scroll_home = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
         scroll_home.pack(fill="both", expand=True)
 
-        primeiro_nome = self.usuario_nome.split()[0] if self.usuario_nome.strip() else "Usuário"
+        primeiro_nome = self.usuario_nome.split()[0] if hasattr(self, 'usuario_nome') and self.usuario_nome.strip() else "Usuário"
         ctk.CTkLabel(scroll_home, text=f"Bem-vindo de volta, {primeiro_nome}!",
-                     font=("Arial", 26, "bold")).pack(pady=(10, 20), anchor="w", padx=20)
+                       font=("Arial", 26, "bold")).pack(pady=(10, 20), anchor="w", padx=20)
+
+        stats = self.controller.get_stats()
+        apostas = self.controller.get_apostas()
+        resultados = self.controller.get_resultados()
+
+        total_apostas = stats["total_apostas"]
+        total_gasto = stats["total_gasto"]
+        total_acertos = stats["total_acertos"]
+        total_resultados = stats["total_resultados"]
 
         summary_grid = ctk.CTkFrame(scroll_home, fg_color="transparent")
         summary_grid.pack(fill="x", padx=20)
-        summary_grid.grid_columnconfigure((0, 1, 2), weight=1)
-
-        apostas = self.controller.get_apostas()
-        resultados = self.controller.get_resultados()
-        total_apostas = len(apostas)
-        total_gasto = sum(a.valor for a in apostas)
-        total_acertos = sum(a.acertos for a in apostas)
-        ultimo_concurso = len(resultados)
+        summary_grid.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         def stat_card(parent, row, col, title, value, color):
             card = ctk.CTkFrame(parent, fg_color=color, corner_radius=10, height=100)
-            card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
+            card.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
             card.grid_propagate(False)
-            ctk.CTkLabel(card, text=title, font=("Arial", 14), text_color="white").pack(pady=(15, 0))
-            lbl_valor = ctk.CTkLabel(card, text=str(value), font=("Arial", 22, "bold"), text_color="white")
-            lbl_valor.pack()
-            return lbl_valor
+            ctk.CTkLabel(card, text=title, font=("Arial", 13), text_color="white").pack(pady=(12, 0))
+            ctk.CTkLabel(card, text=str(value), font=("Arial", 20, "bold"), text_color="white").pack()
+            return card
 
-        stat_card(summary_grid, 0, 0, "Total de Apostas", total_apostas, "#1f6aa5")
+        stat_card(summary_grid, 0, 0, "Total Apostas", total_apostas, "#1f6aa5")
         stat_card(summary_grid, 0, 1, "Total Investido", f"R$ {total_gasto:,.2f}", "#28a745")
         stat_card(summary_grid, 0, 2, "Total Acertos", total_acertos, "#E0A800")
+        stat_card(summary_grid, 0, 3, "Concursos", total_resultados, "#6f42c1")
 
-        info_frame = ctk.CTkFrame(scroll_home, fg_color="#e3f2fd", corner_radius=10,
-                                   border_width=2, border_color=Cores.PRIMARIO)
-        info_frame.pack(fill="x", padx=20, pady=15)
+        alertas_frame = ctk.CTkFrame(scroll_home, fg_color="transparent")
+        alertas_frame.pack(fill="x", padx=20, pady=15)
 
-        info_text = f"Últimos concursos: {ultimo_concurso} | Loterias: {len(LOTERIAS)} | " \
-                    f"Próximo sorteio disponível"
-        ctk.CTkLabel(info_frame, text=info_text, font=("Arial", 13),
-                     text_color="#1565c0").pack(pady=15, padx=15)
+        ctk.CTkLabel(alertas_frame, text="⚠️  Alertas", font=("Arial", 16, "bold")).pack(anchor="w", padx=10)
 
-        ctk.CTkLabel(scroll_home, text="Ações Rápidas", font=("Arial", 18, "bold")) \
-            .pack(pady=(30, 10), anchor="w", padx=20)
+        alertas = self._buscar_alertas()
+        if not alertas:
+            ctk.CTkLabel(alertas_frame, text="Nenhum alerta para hoje.",
+                         font=("Arial", 12, "italic"), text_color="gray").pack(pady=5, padx=10)
+        else:
+            for alerta in alertas:
+                self._criar_card_alerta(alertas_frame, alerta)
 
-        ações_frame = ctk.CTkFrame(scroll_home, fg_color="transparent")
-        ações_frame.pack(fill="x", padx=20)
+        ctk.CTkLabel(scroll_home, text="🔥 Últimos Resultados",
+                     font=("Arial", 18, "bold")).pack(pady=(20, 10), anchor="w", padx=20)
 
-        ctk.CTkButton(ações_frame, text="🎱  Nova Aposta", width=200, height=50,
-                       command=self.mostrar_tela_nova_aposta, fg_color=Cores.PRIMARIO).pack(
-            side="left", padx=10, pady=5)
-        ctk.CTkButton(ações_frame, text="✅  Conferir Apostas", width=200, height=50,
-                       command=self.abrir_conferencia, fg_color=Cores.ALERTA).pack(
-            side="left", padx=10, pady=5)
-        ctk.CTkButton(ações_frame, text="📋  Ver Resultados", width=200, height=50,
-                       command=self.abrir_resultados, fg_color=Cores.PRIMARIO).pack(
-            side="left", padx=10, pady=5)
+        ultimos = resultados[:5]
+        if ultimos:
+            for r in ultimos:
+                self._criar_card_resultado_preview(scroll_home, r)
+        else:
+            ctk.CTkLabel(scroll_home, text="Nenhum resultado disponível.",
+                         font=("Arial", 13, "italic"), text_color="gray").pack(pady=20)
 
         frases = [
             "O sucesso é a soma de pequenos esforços repetidos dia após dia.",
@@ -274,7 +300,61 @@ class App(ctk.CTk):
             "Grandes coisas nunca vêm de zonas de conforto.",
         ]
         ctk.CTkLabel(scroll_home, text=f'"{random.choice(frases)}"',
-                     font=("Arial", 14, "italic"), text_color="gray50").pack(pady=40)
+                       font=("Arial", 14, "italic"), text_color="gray50").pack(pady=40)
+
+    def _buscar_alertas(self) -> list:
+        alertas = []
+        stats = self.controller.get_stats()
+        apostas = self.controller.get_apostas()
+
+        if stats["total_apostas"] == 0:
+            alertas.append({
+                "texto": "Nenhuma aposta cadastrada! Crie sua primeira aposta.",
+                "cor": Cores.ALERTA,
+            })
+
+        if apostas:
+            sem_conferir = [a for a in apostas if not a.conferencia_feita]
+            if sem_conferir:
+                alertas.append({
+                    "texto": f"{len(sem_conferir)} aposta(s) sem conferência!",
+                    "cor": Cores.PERIGO,
+                })
+
+        if stats["total_acertos"] == 0 and stats["total_apostas"] > 0:
+            alertas.append({
+                "texto": "Nenhum acerto registrado. Verifique suas apostas!",
+                "cor": Cores.ALERTA,
+            })
+
+        return alertas
+
+    def _criar_card_alerta(self, parent, alerta):
+        cor = alerta.get("cor", Cores.ALERTA)
+        card = ctk.CTkFrame(parent, fg_color=cor, corner_radius=6)
+        card.pack(fill="x", pady=3, padx=10)
+        ctk.CTkLabel(card, text=f"⚠  {alerta['texto']}", font=("Arial", 12),
+                       text_color="white").pack(side="left", padx=15, pady=8)
+
+    def _criar_card_resultado_preview(self, parent, resultado):
+        card = ctk.CTkFrame(parent, fg_color="#f8f9fa", corner_radius=8,
+                                border_width=1, border_color="#dee2e6")
+        card.pack(fill="x", pady=3, padx=20)
+        card.configure(cursor="hand2")
+
+        header = ctk.CTkFrame(card, fg_color=Cores.PRIMARIO, corner_radius=8)
+        header.pack(fill="x", padx=5, pady=5)
+
+        ctk.CTkLabel(header, text=f"🎰 {LOTERIAS_NOME.get(resultado.tipo_loteria, resultado.tipo_loteria)}",
+                       font=("Arial", 13, "bold"), text_color="white").pack(side="left", padx=10)
+        ctk.CTkLabel(header, text=f"#{resultado.concurso}  |  {resultado.data_sorteio}",
+                       font=("Arial", 12), text_color="white").pack(side="left", padx=10)
+        ctk.CTkLabel(header, text=f"R$ {resultado.premio_acumulado:,.2f}",
+                       font=("Arial", 12, "bold"), text_color="white").pack(side="right", padx=10)
+
+        nums_str = resultado.numeros_por_extenso
+        ctk.CTkLabel(card, text=nums_str, font=("Consolas", 14, "bold"),
+                       text_color=Cores.PRIMARIO).pack(pady=5)
 
     # ------------------------------------------------------------------ #
     # RESULTADOS
@@ -325,6 +405,70 @@ class App(ctk.CTk):
         self.estatisticas_view.render()
 
     # ------------------------------------------------------------------ #
+    # CADASTRO DE JOGADOR
+    # ------------------------------------------------------------------ #
+    def abrir_cadastro(self):
+        self.limpar_conteudo()
+        self.current_view_name = "cadastro"
+
+        scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(scroll, text="👤  Cadastro de Jogador",
+                       font=("Arial", 24, "bold"), text_color=Cores.PRIMARIO).pack(
+            pady=(10, 20), anchor="w", padx=20)
+
+        form_frame = ctk.CTkFrame(scroll, fg_color="#f8f9fa", corner_radius=10)
+        form_frame.pack(fill="x", padx=20, pady=5)
+
+        ctk.CTkLabel(form_frame, text="Nome Completo:", font=("Arial", 13, "bold")).pack(
+            pady=(15, 5), anchor="w", padx=15)
+        self.entry_nome = ctk.CTkEntry(form_frame, placeholder_text="Digite seu nome",
+                                            width=300, fg_color="white",
+                                            text_color="#333333", border_width=0)
+        self.entry_nome.pack(pady=(0, 10), padx=15, fill="x")
+
+        ctk.CTkLabel(form_frame, text="CPF:", font=("Arial", 13, "bold")).pack(
+            pady=(5, 5), anchor="w", padx=15)
+        self.entry_cpf = ctk.CTkEntry(form_frame, placeholder_text="000.000.000-00",
+                                           width=300, fg_color="white",
+                                           text_color="#333333", border_width=0)
+        self.entry_cpf.pack(pady=(0, 10), padx=15, fill="x")
+
+        ctk.CTkLabel(form_frame, text="E-mail:", font=("Arial", 13, "bold")).pack(
+            pady=(5, 5), anchor="w", padx=15)
+        self.entry_email = ctk.CTkEntry(form_frame, placeholder_text="seu@email.com",
+                                              width=300, fg_color="white",
+                                              text_color="#333333", border_width=0)
+        self.entry_email.pack(pady=(0, 15), padx=15, fill="x")
+
+        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        btn_frame.pack(pady=20)
+
+        ctk.CTkButton(btn_frame, text="💾  Salvar Cadastro",
+                         command=self.salvar_cadastro, fg_color=Cores.PRIMARIO,
+                         hover_color="#0d3c6b").pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="🔙  Voltar",
+                         command=self.voltar_inicio, fg_color=Cores.NEUTRO,
+                         hover_color="#4a5258").pack(side="left", padx=10)
+
+    def salvar_cadastro(self):
+        nome = self.entry_nome.get().strip()
+        cpf = self.entry_cpf.get().strip()
+        email = self.entry_email.get().strip()
+
+        if not nome or not cpf:
+            self._mostrar_toast("❌ Nome e CPF são obrigatórios!")
+            return
+
+        jogador = self.controller.add_jogador(nome=nome, cpf=cpf, email=email)
+        self.jogador_atual = jogador
+        self.usuario_nome = nome
+
+        self._mostrar_toast(f"✅ Cadastro salvo: {nome}!")
+        self.after(1500, lambda: self.voltar_inicio())
+
+    # ------------------------------------------------------------------ #
     # TELA NOVA APOSTA
     # ------------------------------------------------------------------ #
     def mostrar_tela_nova_aposta(self):
@@ -335,7 +479,7 @@ class App(ctk.CTk):
         scroll.pack(fill="both", expand=True, padx=20, pady=20)
 
         ctk.CTkLabel(scroll, text="🎱  Nova Aposta",
-                     font=("Arial", 24, "bold"), text_color=Cores.PRIMARIO).pack(
+                       font=("Arial", 24, "bold"), text_color=Cores.PRIMARIO).pack(
             pady=(10, 20), anchor="w", padx=20)
 
         # Seleção de loteria
@@ -345,7 +489,7 @@ class App(ctk.CTk):
             pady=(15, 5), anchor="w", padx=15)
 
         self.cmb_loteria = ctk.CTkComboBox(frame_loteria, values=list(LOTERIAS.keys()),
-                                           width=300, command=self._on_loteria_selecionada)
+                                                 width=300, command=self._on_loteria_selecionada)
         self.cmb_loteria.pack(pady=(0, 15), padx=15, fill="x")
         self.cmb_loteria.select("mega-sena")
 
@@ -367,8 +511,8 @@ class App(ctk.CTk):
             pady=(15, 5), anchor="w", padx=15)
 
         self.entry_valor = ctk.CTkEntry(frame_valor, placeholder_text="6.00",
-                                          width=200, fg_color="white",
-                                          text_color="#333333", border_width=0)
+                                              width=200, fg_color="white",
+                                              text_color="#333333", border_width=0)
         self.entry_valor.pack(pady=(0, 15), padx=15)
         self.entry_valor.insert(0, "6.00")
 
@@ -376,15 +520,15 @@ class App(ctk.CTk):
         btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
         btn_frame.pack(pady=20)
 
-        ctk.CTkButton(btn_frame, text="🎲  Gerar Números Aleatórios",
-                       command=self.gerar_numeros, fg_color=Cores.PRIMARIO,
-                       hover_color="#0d3c6b").pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="🎲  Gerar Números",
+                         command=self.gerar_numeros, fg_color=Cores.PRIMARIO,
+                         hover_color="#0d3c6b").pack(side="left", padx=10)
         ctk.CTkButton(btn_frame, text="💰  Salvar Aposta",
-                       command=self.salvar_aposta, fg_color=Cores.SUCESSO,
-                       hover_color="#1e7e34").pack(side="left", padx=10)
+                         command=self.salvar_aposta, fg_color=Cores.SUCESSO,
+                         hover_color="#1e7e34").pack(side="left", padx=10)
         ctk.CTkButton(btn_frame, text="🔙  Voltar",
-                       command=self.voltar_inicio, fg_color=Cores.NEUTRO,
-                       hover_color="#4a5258").pack(side="left", padx=10)
+                         command=self.voltar_inicio, fg_color=Cores.NEUTRO,
+                         hover_color="#4a5258").pack(side="left", padx=10)
 
     def _on_loteria_selecionada(self, value):
         self.gerar_numeros()
@@ -392,7 +536,9 @@ class App(ctk.CTk):
     def gerar_numeros(self):
         tipo = self.cmb_loteria.get() if hasattr(self, 'cmb_loteria') else "mega-sena"
         qtd, maximo = NUMEROS_POR_LOTERIA.get(tipo, (6, 60))
-        numeros = gerar_numeros_aleatorios(qtd, maximo)
+        numeros = []
+        import random
+        numeros = sorted(random.sample(range(1, maximo + 1), qtd))
 
         for widget in self.numeros_frame.winfo_children():
             widget.destroy()
@@ -401,16 +547,13 @@ class App(ctk.CTk):
         self.qtd_numeros = qtd
         self.maximo_numeros = maximo
 
+        cols = 10
         for i, n in enumerate(numeros):
             lbl = ctk.CTkLabel(self.numeros_frame, text=str(n),
-                                font=("Arial", 20, "bold"), width=40, height=40,
-                                fg_color=Cores.PRIMARIO, text_color="white",
-                                corner_radius=20)
-            lbl.grid(row=i // 10, column=i % 10, padx=3, pady=3)
-
-        ctk.CTkLabel(self.numeros_frame, text=f"({len(numeros)} números de 1 a {maximo})",
-                     font=("Arial", 12, "italic"), text_color="gray").grid(
-            row=(len(numeros) - 1) // 10 + 1, column=0, columnspan=10, pady=5)
+                                   font=("Arial", 20, "bold"), width=38, height=38,
+                                   fg_color=Cores.PRIMARIO, text_color="white",
+                                   corner_radius=20)
+            lbl.grid(row=i // cols, column=i % cols, padx=2, pady=2)
 
     def salvar_aposta(self):
         tipo = self.cmb_loteria.get()
@@ -434,28 +577,27 @@ class App(ctk.CTk):
         data_sorteio = datetime.now().strftime("%d/%m/%Y")
         aposta = self.controller.add_aposta(tipo, numeros, valor, data_sorteio)
 
-        confirm = ctk.CTkEntry(self.content_frame, placeholder_text="Aposta salva com sucesso!",
-                                width=400, fg_color="#c8e6c9", text_color="#1b5e20",
-                                border_width=2, font=("Arial", 14, "bold"))
-        confirm.pack(pady=20)
-
-        self.after(2000, lambda: confirm.destroy())
-        self.after(2500, lambda: self.abrir_apostas())
+        self._mostrar_toast(f"✅ Aposta salva: {LOTERIAS_NOME.get(tipo, tipo)} | {len(numeros)} números | R$ {valor:.2f}")
+        self.after(1500, lambda: self.abrir_apostas())
 
     # ------------------------------------------------------------------ #
-    # CONFERÊNCIA
+    # EXPORTAÇÃO
     # ------------------------------------------------------------------ #
-    def mostrar_tela_conferencia(self):
-        self.abrir_conferencia()
-
     def mostrar_exportacao(self, texto: str):
         self.limpar_conteudo()
         scroll = ctk.CTkScrollableFrame(self.content_frame, fg_color="transparent")
         scroll.pack(fill="both", expand=True, padx=20, pady=20)
 
         ctk.CTkLabel(scroll, text="📄  Relatório de Apostas",
-                     font=("Arial", 22, "bold"), text_color=Cores.PRIMARIO).pack(
+                       font=("Arial", 22, "bold"), text_color=Cores.PRIMARIO).pack(
             pady=(10, 20), anchor="w", padx=20)
+
+        frame_info = ctk.CTkFrame(scroll, fg_color="#e3f2fd", corner_radius=10,
+                                      border_width=2, border_color=Cores.PRIMARIO)
+        frame_info.pack(fill="x", pady=(0, 15), padx=20)
+        ctk.CTkLabel(frame_info, text=f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
+                                          f"Total de apostas: {len(self.controller.get_apostas())}",
+                       font=("Arial", 12), text_color="#1565c0").pack(pady=15, padx=15)
 
         text_box = ctk.CTkTextbox(scroll, width=800, height=400, font=("Consolas", 12))
         text_box.pack(pady=10, padx=20, fill="both", expand=True)
@@ -463,13 +605,33 @@ class App(ctk.CTk):
 
         btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
         btn_frame.pack(pady=15)
-        ctk.CTkButton(btn_frame, text="📋 Copiar", command=lambda: self.app.clipboard_append(texto),
-                       fg_color=Cores.PRIMARIO).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="🔙 Voltar", command=self.abrir_apostas,
-                       fg_color=Cores.NEUTRO).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="📋 Copiar para Área de Transferência",
+                         command=lambda: self._copiar_texto(texto),
+                         fg_color=Cores.PRIMARIO).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="💾 Salvar em Arquivo",
+                         command=lambda: self._salvar_arquivo(texto),
+                         fg_color=Cores.SUCESSO).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="🔙 Voltar",
+                         command=self.abrir_apostas,
+                         fg_color=Cores.NEUTRO).pack(side="left", padx=10)
+
+    def _copiar_texto(self, texto: str):
+        self.clipboard_clear()
+        self.clipboard_append(texto)
+        self._mostrar_toast("✅ Texto copiado!")
+
+    def _salvar_arquivo(self, texto: str):
+        filename = f"relatorio_loterias_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        filepath = f"G:/Python/BR_Loterias_Caixa/{filename}"
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(texto)
+            self._mostrar_toast(f"✅ Relatório salvo: {filepath}")
+        except Exception as e:
+            self._mostrar_toast(f"❌ Erro ao salvar: {str(e)}")
 
     # ------------------------------------------------------------------ #
-    # RELÓGIO / STATUS (rodapé)
+    # RELÓGIO / STATUS
     # ------------------------------------------------------------------ #
     def atualizar_tempo(self):
         agora = datetime.now()

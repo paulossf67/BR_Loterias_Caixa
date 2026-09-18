@@ -4,6 +4,9 @@ from typing import List, Optional
 from models.resultado import Resultado
 from models.aposta import Aposta
 from cores import Cores
+from services.api_service import LOTERIAS
+
+LOTERIAS_NOME = {k: v["nome"] for k, v in LOTERIAS.items()}
 
 
 class ResultadosView:
@@ -11,27 +14,31 @@ class ResultadosView:
         self.parent = parent
         self.controller = controller
         self.scroll_frame = None
+        self.tipo_filtro = "Todas"
 
     def render(self):
         self.parent.limpar_conteudo()
-        self.scroll_frame = ctk.CTkScrollableFrame(self.parent.content_frame, fg_color="transparent")
+        self.scroll_frame = ctk.CTkScrollableFrame(self.parent.content_frame,
+                                                    fg_color="transparent")
         self.scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
         ctk.CTkLabel(self.scroll_frame, text="📋  Resultados das Loterias",
-                     font=("Arial", 22, "bold"), text_color=Cores.PRIMARIO).pack(pady=(10, 20), anchor="w")
+                       font=("Arial", 22, "bold"), text_color=Cores.PRIMARIO).pack(
+            pady=(10, 20), anchor="w")
 
         filtro_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
         filtro_frame.pack(fill="x", pady=(0, 15))
 
-        ctk.CTkLabel(filtro_frame, text="Filtrar por loteria:", font=("Arial", 13)).pack(side="left")
-        self.cmb_loteria = ctk.CTkComboBox(filtro_frame, values=[
-            "Todas", "mega-sena", "quina", "lotofacil", "lotomania", "timemania", "dupla-sena", "dia-de-sorte"
-        ], width=200, command=self._filtrar)
+        ctk.CTkLabel(filtro_frame, text="Filtrar por loteria:",
+                       font=("Arial", 13)).pack(side="left")
+        self.cmb_loteria = ctk.CTkComboBox(filtro_frame,
+                                           values=["Todas"] + list(LOTERIAS.keys()),
+                                           width=200, command=self._filtrar)
         self.cmb_loteria.pack(side="left", padx=10)
         self.cmb_loteria.select("Todas")
 
         self.btn_atualizar = ctk.CTkButton(filtro_frame, text="🔄 Atualizar",
-                                           command=self.controller.sync_and_refresh,
+                                           command=self._sync_e_recarregar,
                                            fg_color=Cores.PRIMARIO, hover_color="#0d3c6b")
         self.btn_atualizar.pack(side="left", padx=10)
 
@@ -40,11 +47,18 @@ class ResultadosView:
 
         self._carregar_resultados()
 
+    def _sync_e_recarregar(self):
+        self.controller.sync_and_refresh()
+        self._carregar_resultados()
+
     def _carregar_resultados(self):
         for widget in self.resultados_frame.winfo_children():
             widget.destroy()
 
         resultados = self.controller.get_resultados()
+        if self.tipo_filtro != "Todas":
+            resultados = [r for r in resultados if r.tipo_loteria == self.tipo_filtro]
+
         if not resultados:
             ctk.CTkLabel(self.resultados_frame, text="Nenhum resultado disponível.",
                          font=("Arial", 14, "italic"), text_color="gray").pack(pady=40)
@@ -64,38 +78,31 @@ class ResultadosView:
         header_frame.pack(fill="x", padx=5, pady=5)
 
         ctk.CTkLabel(header_frame, text=f"🎰 {LOTERIAS_NOME.get(resultado.tipo_loteria, resultado.tipo_loteria)}",
-                     font=("Arial", 14, "bold"), text_color="white").pack(side="left", padx=10)
+                       font=("Arial", 14, "bold"), text_color="white").pack(side="left", padx=10)
         ctk.CTkLabel(header_frame, text=f"Concurso: #{resultado.concurso}",
-                     font=("Arial", 13), text_color="white").pack(side="left", padx=10)
+                       font=("Arial", 13), text_color="white").pack(side="left", padx=10)
         ctk.CTkLabel(header_frame, text=resultado.data_sorteio,
-                     font=("Arial", 12), text_color="white").pack(side="right", padx=10)
+                       font=("Arial", 12), text_color="white").pack(side="right", padx=10)
 
         numeros_frame = ctk.CTkFrame(card, fg_color="transparent")
         numeros_frame.pack(pady=8)
 
         numeros_str = resultado.numeros_por_extenso
         ctk.CTkLabel(numeros_frame, text=numeros_str,
-                     font=("Consolas", 18, "bold"), text_color="#1f6aa5").pack(pady=5)
+                       font=("Consolas", 18, "bold"), text_color=Cores.PRIMARIO).pack(pady=5)
 
         info_frame = ctk.CTkFrame(card, fg_color="transparent")
         info_frame.pack(fill="x", padx=10, pady=(0, 10))
 
-        info_text = f"🏆 Prêmio: R$ {resultado.premio_acumulado:,.2f}  |  👥 Ganhadores: {resultado.ganhadores}  |  💰 Arrecadação: R$ {resultado.arrecadacao_total:,.2f}"
-        ctk.CTkLabel(info_frame, text=info_text, font=("Arial", 11), text_color="#555").pack()
+        info_text = (f"🏆 Prêmio: R$ {resultado.premio_acumulado:,.2f}  |  "
+                     f"👥 Ganhadores: {resultado.ganhadores}  |  "
+                     f"💰 Arrecadação: R$ {resultado.arrecadacao_total:,.2f}")
+        ctk.CTkLabel(info_frame, text=info_text, font=("Arial", 11),
+                       text_color="#555").pack()
 
     def _abrir_detalhes(self, resultado: Resultado):
         self.controller.mostrar_detalhes_resultado(resultado)
 
     def _filtrar(self, value):
+        self.tipo_filtro = value if value else "Todas"
         self._carregar_resultados()
-
-
-LOTERIAS_NOME = {
-    "mega-sena": "Mega-Sena",
-    "quina": "Quina",
-    "lotofacil": "Lotofácil",
-    "lotomania": "Lotomania",
-    "timemania": "Timemania",
-    "dupla-sena": "Dupla Sena",
-    "dia-de-sorte": "Dia de Sorte",
-}
