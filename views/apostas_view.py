@@ -13,6 +13,9 @@ class ApostasView:
     def __init__(self, parent, controller):
         self.parent = parent
         self.controller = controller
+        self.scroll_frame = None
+        self.stats_frame = None
+        self.apostas_frame = None
 
     def render(self):
         self.parent.limpar_conteudo()
@@ -24,29 +27,7 @@ class ApostasView:
                        font=("Arial", 22, "bold"), text_color=Cores.PRIMARIO).pack(
             pady=(10, 20), anchor="w")
 
-        apostas = self.controller.get_apostas()
-        total_gasto = sum(a.valor for a in apostas)
-        total_apostas = len(apostas)
-        total_acertos = sum(a.acertos for a in apostas)
-        premio_total = sum(a.premio for a in apostas)
-
-        stats_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
-        stats_frame.pack(fill="x", pady=(0, 15))
-        stats_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
-
-        def stat_card(parent, row, col, title, value, color):
-            card = ctk.CTkFrame(parent, fg_color=color, corner_radius=10, height=80)
-            card.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
-            card.grid_propagate(False)
-            ctk.CTkLabel(card, text=title, font=("Arial", 12),
-                         text_color="white").pack(pady=(12, 0))
-            ctk.CTkLabel(card, text=str(value), font=("Arial", 18, "bold"),
-                         text_color="white").pack()
-
-        stat_card(stats_frame, 0, 0, "Total Apostas", total_apostas, "#1f6aa5")
-        stat_card(stats_frame, 0, 1, "Total Investido", f"R$ {total_gasto:,.2f}", "#28a745")
-        stat_card(stats_frame, 0, 2, "Total Acertos", total_acertos, "#E0A800")
-        stat_card(stats_frame, 0, 3, "Prêmio Total", f"R$ {premio_total:,.2f}", "#6f42c1")
+        self._render_stats()
 
         acoes_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
         acoes_frame.pack(fill="x", pady=(0, 15))
@@ -54,6 +35,10 @@ class ApostasView:
         ctk.CTkButton(acoes_frame, text="➕ Nova Aposta",
                         command=self.controller.nova_aposta,
                         fg_color=Cores.PRIMARIO, hover_color="#0d3c6b").pack(
+            side="left", padx=5)
+        ctk.CTkButton(acoes_frame, text="🖨️ Imprimir Selecionada",
+                        command=self._imprimir_selecionada,
+                        fg_color="#007bff", hover_color="#0056b3").pack(
             side="left", padx=5)
         ctk.CTkButton(acoes_frame, text="📊 Conferir",
                         command=self.controller.conferir_apostas,
@@ -68,6 +53,37 @@ class ApostasView:
         self.apostas_frame.pack(fill="both", expand=True)
 
         self._carregar_apostas()
+
+    def _render_stats(self):
+        if self.scroll_frame:
+            for w in self.scroll_frame.winfo_children():
+                if hasattr(w, '_eh_stats_frame') and w._eh_stats_frame:
+                    w.destroy()
+
+        apostas = self.controller.get_apostas()
+        total_gasto = sum(a.valor for a in apostas)
+        total_apostas = len(apostas)
+        total_acertos = sum(a.acertos for a in apostas)
+        premio_total = sum(a.premio for a in apostas)
+
+        self.stats_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+        self.stats_frame.pack(fill="x", pady=(0, 15))
+        self.stats_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        self.stats_frame._eh_stats_frame = True
+
+        def stat_card(parent, row, col, title, value, color):
+            card = ctk.CTkFrame(parent, fg_color=color, corner_radius=10, height=80)
+            card.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+            card.grid_propagate(False)
+            ctk.CTkLabel(card, text=title, font=("Arial", 12),
+                         text_color="white").pack(pady=(12, 0))
+            ctk.CTkLabel(card, text=str(value), font=("Arial", 18, "bold"),
+                         text_color="white").pack()
+
+        stat_card(self.stats_frame, 0, 0, "Total Apostas", total_apostas, "#1f6aa5")
+        stat_card(self.stats_frame, 0, 1, "Total Investido", f"R$ {total_gasto:,.2f}", "#28a745")
+        stat_card(self.stats_frame, 0, 2, "Total Acertos", total_acertos, "#E0A800")
+        stat_card(self.stats_frame, 0, 3, "Prêmio Total", f"R$ {premio_total:,.2f}", "#6f42c1")
 
     def _carregar_apostas(self):
         for widget in self.apostas_frame.winfo_children():
@@ -118,7 +134,22 @@ class ApostasView:
         btn_frame.pack(fill="x", padx=10, pady=(0, 8))
         btn_frame.pack_propagate(False)
 
+        ctk.CTkButton(btn_frame, text="🖨️ Boleto", width=80,
+                        command=lambda a=aposta: self.controller.imprimir_boleto(a),
+                        fg_color="#007bff", hover_color="#0056b3").pack(
+            side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="👁️ Detalhes", width=80,
+                        command=lambda a=aposta: self.parent.mostrar_detalhes_aposta(a),
+                        fg_color=Cores.PRIMARIO, hover_color="#0d3c6b").pack(
+            side="left", padx=5)
         ctk.CTkButton(btn_frame, text="🗑️ Excluir", width=80,
                         command=lambda id=aposta.id: self.controller.remover_aposta(id),
                         fg_color=Cores.PERIGO, hover_color="#a83232").pack(
             side="right", padx=5)
+
+    def _imprimir_selecionada(self):
+        apostas = self.controller.get_apostas()
+        if not apostas:
+            self.parent._mostrar_toast("Nenhuma aposta para imprimir")
+            return
+        self.controller.imprimir_boleto(apostas[0])

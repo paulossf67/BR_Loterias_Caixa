@@ -7,4 +7,6 @@ __pycache__/
 *.sqlite
 .env
 .env
-*.md
+boletos/
+data/backups/
+.pytest_cache/

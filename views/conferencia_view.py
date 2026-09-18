@@ -9,7 +9,7 @@ from services.api_service import LOTERIAS
 LOTERIAS_NOME = {k: v["nome"] for k, v in LOTERIAS.items()}
 
 
-class ConferênciaView:
+class ConferenciaView:
     def __init__(self, parent, controller):
         self.parent = parent
         self.controller = controller
@@ -53,7 +53,7 @@ class ConferênciaView:
         self.cmb_concurso = ctk.CTkComboBox(frame, values=options, width=300,
                                             command=self._on_concurso_selecionado)
         self.cmb_concurso.pack(side="left", padx=10)
-        self.cmb_concurso.select(0)
+        self.cmb_concurso.set(options[0])
 
         if resultados:
             self.resultado_selecionado = resultados[0]
@@ -81,8 +81,7 @@ class ConferênciaView:
             for widget in self.apostas_frame.winfo_children():
                 widget.destroy()
 
-        apostas = self.controller.get_apostas()
-        if not apostas:
+        if not self.controller.get_apostas():
             ctk.CTkLabel(self.scroll_frame, text="Nenhuma aposta cadastrada.",
                          font=("Arial", 14, "italic"), text_color="gray").pack(pady=20)
             return
@@ -98,28 +97,30 @@ class ConferênciaView:
         # Criar cabeçalho com resumo
         resumo_frame = ctk.CTkFrame(self.scroll_frame, fg_color="#f0f0f0", corner_radius=8)
         resumo_frame.pack(fill="x", pady=5, padx=20)
-        total_apostas = len(apostas)
-        total_acertos = 0
-        total_premio = 0.0
+        conferidas = self.controller.conferir_resultado(self.resultado_selecionado)
+        if not conferidas:
+            ctk.CTkLabel(self.apostas_frame,
+                         text="Nenhuma aposta desta loteria/concurso para conferir.",
+                         font=("Arial", 14, "italic"), text_color="gray").pack(pady=20)
+            return
 
-        for a in apostas:
-            acertos = len(set(a.numeros) & set(self.resultado_selecionado.numeros_sorteados))
-            total_acertos += acertos
-            if acertos > 0:
-                total_premio += a.valor * {6: 1000, 5: 50, 4: 10, 3: 5, 2: 2, 1: 1}.get(acertos, 0)
-
+        total_premio = sum(c["premio"] for c in conferidas)
+        total_premiadas = sum(1 for c in conferidas if c["premio"] > 0)
         ctk.CTkLabel(resumo_frame,
-                       text=f"Total: {total_apostas} apostas | {total_acertos} acertos | Prêmio estimado: R$ {total_premio:,.2f}",
+                       text=f"Total: {len(conferidas)} apostas | {total_premiadas} premiada(s) | Prêmio: R$ {total_premio:,.2f}",
                        font=("Arial", 13, "bold"), text_color=Cores.PRIMARIO).pack(
             pady=10, padx=15)
 
-        for a in sorted(apostas, key=lambda x: x.acertos if hasattr(x, 'acertos') else 0, reverse=True):
-            self._criar_card_conferencia(a, self.resultado_selecionado)
+        for c in sorted(conferidas, key=lambda x: x["acertos"], reverse=True):
+            self._criar_card_conferencia(c["aposta"], self.resultado_selecionado,
+                                         c["acertos"], c["premio"])
+        self._registrar_conferencias(conferidas)
 
-    def _criar_card_conferencia(self, aposta: Aposta, resultado: Resultado):
-        acertos = len(set(aposta.numeros) & set(resultado.numeros_sorteados))
-        cor_fundo = "#c8e6c9" if acertos > 0 else "#ffcdd2"
-        cor_borda = Cores.SUCESSO if acertos > 0 else Cores.PERIGO
+    def _criar_card_conferencia(self, aposta: Aposta, resultado: Resultado,
+                                acertos: int, premio: float):
+        premiada = premio > 0
+        cor_fundo = "#c8e6c9" if premiada else "#ffcdd2"
+        cor_borda = Cores.SUCESSO if premiada else Cores.PERIGO
 
         card = ctk.CTkFrame(self.apostas_frame, fg_color=cor_fundo, corner_radius=10,
                             border_width=2, border_color=cor_borda)
@@ -129,7 +130,7 @@ class ConferênciaView:
         header.pack(fill="x", padx=5, pady=5)
 
         nome = LOTERIAS_NOME.get(aposta.tipo_loteria, aposta.tipo_loteria)
-        ctk.CTkLabel(header, text=f"🎰 {nome} - Concurso {aposta.data_sorteio}",
+        ctk.CTkLabel(header, text=f"🎰 {nome} - Concurso {resultado.concurso}",
                        font=("Arial", 13, "bold"), text_color="white").pack(
             side="left", padx=10)
         ctk.CTkLabel(header, text=f"🎯 {acertos} acerto(s)",
@@ -139,27 +140,31 @@ class ConferênciaView:
         nums_apostados = " | ".join(str(n) for n in aposta.numeros)
         ctk.CTkLabel(card, text=f"Seus números: {nums_apostados}",
                        font=("Consolas", 13)).pack(pady=5, padx=10, anchor="w")
-
-        nums_sorteados = resultado.numeros_por_extenso
-        ctk.CTkLabel(card, text=f"Sorteados: {nums_sorteados}",
+        ctk.CTkLabel(card, text=f"Sorteados: {resultado.numeros_por_extenso}",
                        font=("Consolas", 13), text_color="#333").pack(
             pady=(0, 5), padx=10)
 
-        if acertos > 0:
-            premio = self._calcular_premio(acertos, aposta.valor)
-            ctk.CTkLabel(card, text=f"💵 Prêmio estimado: R$ {premio:,.2f}",
+        if premiada:
+            ctk.CTkLabel(card, text=f"💵 Prêmio: R$ {premio:,.2f}",
                            font=("Arial", 13, "bold"), text_color=Cores.SUCESSO).pack(
                 pady=(0, 8), padx=10)
 
-        # Marcar como conferido
-        if not aposta.conferencia_feita:
+    def _registrar_conferencias(self, conferidas: list):
+        """Persiste as conferências novas (uma vez por aposta), sem redesenhar a tela."""
+        for c in conferidas:
+            aposta = c["aposta"]
+            if aposta.conferencia_feita:
+                continue
+            aposta.acertos, aposta.premio = c["acertos"], c["premio"]
             aposta.conferencia_feita = True
-            self.controller.salvar_conferencia(self._criar_conferencia(aposta, resultado, acertos))
+            self.controller.salvar_conferencia(
+                self._criar_conferencia(aposta, self.resultado_selecionado,
+                                        c["acertos"], c["premio"]))
+            self.controller.atualizar_aposta(aposta)
 
-    def _criar_conferencia(self, aposta: Aposta, resultado: Resultado, acertos: int):
-        from models.conferencia import Conferência
-        premio = self._calcular_premio(acertos, aposta.valor)
-        return Conferência(
+    def _criar_conferencia(self, aposta: Aposta, resultado: Resultado, acertos: int, premio: float):
+        from models.conferencia import Conferencia
+        return Conferencia(
             id_aposta=aposta.id,
             tipo_loteria=aposta.tipo_loteria,
             concurso=resultado.concurso,
@@ -167,13 +172,6 @@ class ConferênciaView:
             numeros_apostados=aposta.numeros,
             numeros_sorteados=resultado.numeros_sorteados,
             qtd_acertos=acertos,
-            premio_ganho=aposta.premio,
-            status="concluído" if acertos > 0 else "pendente"
+            premio_ganho=premio,
+            status="concluído" if premio > 0 else "pendente"
         )
-
-    def _calcular_acertos(self, meus_numeros: list, sorteados: list) -> int:
-        return len(set(meus_numeros) & set(sorteados))
-
-    def _calcular_premio(self, acertos: int, valor_aposta: float) -> float:
-        multiplicadores = {6: 1000, 5: 50, 4: 10, 3: 5, 2: 2, 1: 1, 0: 0}
-        return valor_aposta * multiplicadores.get(acertos, 0)

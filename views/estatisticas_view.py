@@ -6,6 +6,8 @@ from models.resultado import Resultado
 from models.aposta import Aposta
 from cores import Cores
 from services.api_service import LOTERIAS
+from services import estatisticas as est
+from views.graficos import GraficoBarras, legenda
 
 LOTERIAS_NOME = {k: v["nome"] for k, v in LOTERIAS.items()}
 
@@ -35,6 +37,7 @@ class EstatisticasView:
             return
 
         self._render_painel_informacoes(stats)
+        self._render_graficos(resultados, apostas)
         self._render_frequencia(resultados)
         self._render_porcentagem_acertos(apostas)
         self._render_numeros_quentes_frios(resultados)
@@ -54,6 +57,75 @@ class EstatisticasView:
                  f"Acertos: {stats['total_acertos']}")
         ctk.CTkLabel(info_frame, text=texto, font=("Arial", 13),
                        text_color="#1565c0").pack(pady=15, padx=15)
+
+    def _titulo(self, texto):
+        ctk.CTkLabel(self.scroll_frame, text=texto, font=("Arial", 16, "bold")).pack(
+            pady=(20, 6), anchor="w", padx=20)
+
+    def _vazio(self, texto):
+        ctk.CTkLabel(self.scroll_frame, text=texto, font=("Arial", 12, "italic"),
+                     text_color="gray").pack(anchor="w", padx=20)
+
+    def _render_graficos(self, resultados: List[Resultado], apostas: List[Aposta]):
+        tipos = [t for t in LOTERIAS if any(r.tipo_loteria == t for r in resultados)]
+        self._titulo("📊 Frequência e atraso por número")
+        if tipos:
+            self._tipo_grafico = tipos[0]
+            self.cmb_grafico = ctk.CTkComboBox(
+                self.scroll_frame, values=[LOTERIAS_NOME[t] for t in tipos], width=220,
+                command=lambda nome: self._trocar_loteria(nome, resultados))
+            self.cmb_grafico.set(LOTERIAS_NOME[tipos[0]])
+            self.cmb_grafico.pack(anchor="w", padx=20)
+            self.area_freq = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+            self.area_freq.pack(fill="x", padx=20, pady=5)
+            self._desenhar_frequencia(resultados)
+
+        self._titulo("🎯 Apostas por quantidade de acertos")
+        dist = est.distribuicao_acertos(apostas)
+        if dist:
+            GraficoBarras(self.scroll_frame, [str(k) for k in dist],
+                          [("Apostas", Cores.PRIMARIO, list(dist.values()))]
+                          ).pack(fill="x", padx=20, pady=5)
+        else:
+            self._vazio("Nenhuma aposta conferida ainda.")
+
+        self._titulo("💰 Investido x prêmios por mês")
+        fin = est.financeiro_por_mes(apostas)
+        if fin:
+            legenda(self.scroll_frame, [("Investido", Cores.PERIGO), ("Prêmios", Cores.SUCESSO)]
+                    ).pack(anchor="w", padx=20)
+            GraficoBarras(self.scroll_frame, [m for m, _, _ in fin],
+                          [("Investido", Cores.PERIGO, [i for _, i, _ in fin]),
+                           ("Prêmios", Cores.SUCESSO, [p for _, _, p in fin])],
+                          formato=lambda v: f"R$ {v:,.0f}").pack(fill="x", padx=20, pady=5)
+        else:
+            self._vazio("Sem apostas com data válida.")
+
+    def _trocar_loteria(self, nome, resultados):
+        self._tipo_grafico = next(k for k, v in LOTERIAS_NOME.items() if v == nome)
+        self._desenhar_frequencia(resultados)
+
+    def _desenhar_frequencia(self, resultados):
+        for w in self.area_freq.winfo_children():
+            w.destroy()
+        tipo = self._tipo_grafico
+        freq = est.frequencia_numeros(resultados, tipo)
+        atraso = est.atraso_numeros(resultados, tipo)
+        nums = list(freq)
+        media = sum(freq.values()) / len(freq) if freq else 0
+        destaques = {i: (Cores.ALERTA if freq[n] > media * 1.15
+                         else Cores.PRIMARIO if freq[n] < media * 0.85 else "#9aa5ad")
+                     for i, n in enumerate(nums)}
+        ctk.CTkLabel(self.area_freq, text="Vezes sorteado (laranja = acima da média, azul = abaixo)",
+                     font=("Arial", 11)).pack(anchor="w")
+        GraficoBarras(self.area_freq, [str(n) for n in nums],
+                      [("Sorteios", "#9aa5ad", [freq[n] for n in nums])],
+                      destaques=destaques).pack(fill="x")
+        ctk.CTkLabel(self.area_freq, text="Atraso (concursos desde a última vez que saiu)",
+                     font=("Arial", 11)).pack(anchor="w", pady=(10, 0))
+        GraficoBarras(self.area_freq, [str(n) for n in nums],
+                      [("Atraso", Cores.DOCUMENTO, [atraso[n] for n in nums])]
+                      ).pack(fill="x")
 
     def _render_frequencia(self, resultados: List[Resultado]):
         ctk.CTkLabel(self.scroll_frame, text="📈 Frequência por Tipo de Loteria",

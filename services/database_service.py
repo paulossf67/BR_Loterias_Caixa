@@ -1,15 +1,16 @@
 import sqlite3
 import json
 import os
+from utils.paths import BASE_DIR
 from datetime import datetime
 from typing import List, Optional
 
 from models.resultado import Resultado
 from models.aposta import Aposta
 from models.jogador import Jogador
-from models.conferencia import Conferência
+from models.conferencia import Conferencia
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "loterias.db")
+DB_PATH = os.path.join(BASE_DIR, "data", "loterias.db")
 
 
 class DatabaseService:
@@ -88,6 +89,17 @@ class DatabaseService:
             )
         """)
 
+        # Migração: coluna de premiação por faixa
+        colunas = {r["name"] for r in cursor.execute("PRAGMA table_info(resultados)")}
+        if "premiacao" not in colunas:
+            cursor.execute("ALTER TABLE resultados ADD COLUMN premiacao TEXT DEFAULT '{}'")
+
+        colunas = {r["name"] for r in cursor.execute("PRAGMA table_info(apostas)")}
+        if "cotas" not in colunas:
+            cursor.execute("ALTER TABLE apostas ADD COLUMN cotas INTEGER DEFAULT 1")
+        if "id_jogador" not in colunas:
+            cursor.execute("ALTER TABLE apostas ADD COLUMN id_jogador INTEGER DEFAULT 0")
+
         conn.commit()
         conn.close()
 
@@ -100,12 +112,13 @@ class DatabaseService:
                 INSERT OR REPLACE INTO resultados 
                 (id, tipo_loteria, concurso, data_sorteio, data_apuracao, 
                  numeros_sorteados, numeros_especiais, premio_acumulado, 
-                 ganhadores, arrecadacao_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ganhadores, arrecadacao_total, premiacao)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 r.id, r.tipo_loteria, r.concurso, r.data_sorteio, r.data_apuração,
                 json.dumps(r.numeros_sorteados), json.dumps(r.numeros_especiais),
-                r.premio_acumulado, r.ganhadores, r.arrecadacao_total
+                r.premio_acumulado, r.ganhadores, r.arrecadacao_total,
+                json.dumps({str(k): v for k, v in r.premiacao.items()})
             ))
         conn.commit()
         conn.close()
@@ -138,6 +151,7 @@ class DatabaseService:
             premio_acumulado=row["premio_acumulado"],
             ganhadores=row["ganhadores"],
             arrecadacao_total=row["arrecadacao_total"],
+            premiacao={int(k): float(v) for k, v in json.loads(row["premiacao"] or "{}").items()},
         )
 
     # === APOSTAS ===
@@ -146,12 +160,12 @@ class DatabaseService:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO apostas (tipo_loteria, data_aposta, numeros, valor, 
-                                 data_sorteio, acertos, premio, conferencia_feita)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                 data_sorteio, acertos, premio, conferencia_feita, id_jogador, cotas)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             aposta.tipo_loteria, aposta.data_aposta, json.dumps(aposta.numeros),
             aposta.valor, aposta.data_sorteio, aposta.acertos, aposta.premio,
-            int(aposta.conferencia_feita)
+            int(aposta.conferencia_feita), aposta.id_jogador, aposta.cotas
         ))
         aposta.id = cursor.lastrowid
         conn.commit()
@@ -169,8 +183,21 @@ class DatabaseService:
     def remover_aposta(self, aposta_id: int) -> bool:
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM apostas WHERE id = ?", (aposta_id,))
         cursor.execute("DELETE FROM conferencias WHERE id_aposta = ?", (aposta_id,))
+        cursor.execute("DELETE FROM apostas WHERE id = ?", (aposta_id,))
+        affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return affected > 0
+
+    def atualizar_aposta(self, aposta: Aposta) -> bool:
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE apostas SET 
+                acertos = ?, premio = ?, conferencia_feita = ?
+            WHERE id = ?
+        """, (aposta.acertos, aposta.premio, int(aposta.conferencia_feita), aposta.id))
         conn.commit()
         affected = cursor.rowcount
         conn.close()
@@ -179,6 +206,8 @@ class DatabaseService:
     def _row_to_aposta(self, row) -> Aposta:
         return Aposta(
             id=row["id"],
+            id_jogador=row["id_jogador"] or 0,
+            cotas=row["cotas"] or 1,
             tipo_loteria=row["tipo_loteria"],
             data_aposta=row["data_aposta"],
             numeros=json.loads(row["numeros"]),
@@ -223,8 +252,21 @@ class DatabaseService:
             )
         return None
 
+    def get_jogadores(self) -> List[Jogador]:
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM jogadores ORDER BY data_cadastro DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [Jogador(
+            id=row["id"], nome=row["nome"], cpf=row["cpf"],
+            email=row["email"], data_cadastro=row["data_cadastro"],
+            total_gasto=row["total_gasto"], total_acertos=row["total_acertos"],
+            total_premios=row["total_premios"]
+        ) for row in rows]
+
     # === CONFERÊNCIAS ===
-    def salvar_conferencia(self, conf: Conferência):
+    def salvar_conferencia(self, conf: Conferencia):
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -240,7 +282,7 @@ class DatabaseService:
         conn.commit()
         conn.close()
 
-    def get_conferencias(self) -> List[Conferência]:
+    def get_conferencias(self) -> List[Conferencia]:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM conferencias ORDER BY data_conferida DESC")
@@ -248,8 +290,8 @@ class DatabaseService:
         conn.close()
         return [self._row_to_conferencia(row) for row in rows]
 
-    def _row_to_conferencia(self, row) -> Conferência:
-        return Conferência(
+    def _row_to_conferencia(self, row) -> Conferencia:
+        return Conferencia(
             id=row["id"],
             id_aposta=row["id_aposta"],
             tipo_loteria=row["tipo_loteria"],

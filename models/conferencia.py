@@ -3,7 +3,7 @@ from typing import List
 
 
 @dataclass
-class Conferência:
+class Conferencia:
     id: int = 0
     id_aposta: int = 0
     tipo_loteria: str = ""

@@ -35,7 +35,7 @@ class ResultadosView:
                                            values=["Todas"] + list(LOTERIAS.keys()),
                                            width=200, command=self._filtrar)
         self.cmb_loteria.pack(side="left", padx=10)
-        self.cmb_loteria.select("Todas")
+        self.cmb_loteria.set("Todas")
 
         self.btn_atualizar = ctk.CTkButton(filtro_frame, text="🔄 Atualizar",
                                            command=self._sync_e_recarregar,

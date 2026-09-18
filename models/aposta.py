@@ -14,6 +14,8 @@ class Aposta:
     acertos: int = 0
     premio: float = 0.0
     conferencia_feita: bool = False
+    id_jogador: int = 0
+    cotas: int = 1  # bolão: nº de participantes que dividem o prêmio
 
     def to_dict(self) -> dict:
         return {
@@ -25,7 +27,9 @@ class Aposta:
             "data_sorteio": self.data_sorteio,
             "acertos": self.acertos,
             "premio": self.premio,
-            "conferiencia_feita": self.conferencia_feita,
+            "conferencia_feita": self.conferencia_feita,
+            "id_jogador": self.id_jogador,
+            "cotas": self.cotas,
         }
 
     @classmethod
@@ -40,6 +44,8 @@ class Aposta:
             acertos=data.get("acertos", 0),
             premio=data.get("premio", 0.0),
             conferencia_feita=data.get("conferencia_feita", False),
+            id_jogador=data.get("id_jogador", 0),
+            cotas=data.get("cotas", 1) or 1,
         )
 
     @property

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 
 
 @dataclass
@@ -14,6 +14,7 @@ class Resultado:
     premio_acumulado: float = 0.0
     ganhadores: int = 0
     arrecadacao_total: float = 0.0
+    premiacao: Dict[int, float] = field(default_factory=dict)  # acertos -> prêmio por ganhador
 
     def to_dict(self) -> dict:
         return {
@@ -27,6 +28,7 @@ class Resultado:
             "premio_acumulado": self.premio_acumulado,
             "ganhadores": self.ganhadores,
             "arrecadacao_total": self.arrecadacao_total,
+            "premiacao": self.premiacao,
         }
 
     @classmethod
@@ -42,6 +44,7 @@ class Resultado:
             premio_acumulado=data.get("premio_acumulado", 0.0),
             ganhadores=data.get("ganhadores", 0),
             arrecadacao_total=data.get("arrecadacao_total", 0.0),
+            premiacao={int(k): float(v) for k, v in (data.get("premiacao") or {}).items()},
         )
 
     @property
