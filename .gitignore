@@ -14,3 +14,4 @@ data/backups/
 build/
 dist/
 *.spec
+installer/
