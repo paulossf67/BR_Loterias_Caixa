@@ -1,5 +1,5 @@
 """
-Sistema de Controle de Apostas e Resultados das Loterias da Caixa.
+Controle de Apostas Lotéricas: apostas e resultados das loterias da Caixa.
 Interface gráfica com CustomTkinter.
 """
 import logging
@@ -43,7 +43,7 @@ class App(BuscaMixin, NovaApostaMixin, SistemaMixin, ctk.CTk):
         self.current_view_name = "home"
         self.jogador_atual = None
 
-        self.title("🎰  Loterias da Caixa - Sistema de Controle")
+        self.title("🎰  Controle de Apostas Lotéricas")
         self.geometry("1200x750")
         try:
             self.state("zoomed")
@@ -77,7 +77,7 @@ class App(BuscaMixin, NovaApostaMixin, SistemaMixin, ctk.CTk):
         self.lbl_hora = ctk.CTkLabel(self.header, text="", font=("Arial", 16), text_color="white")
         self.lbl_hora.pack(side="left", padx=20)
 
-        self.lbl_titulo = ctk.CTkLabel(self.header, text="🎰  LOTERIAS DA CAIXA",
+        self.lbl_titulo = ctk.CTkLabel(self.header, text="🎰 CONTROLE DE APOSTAS LOTÉRICAS",
                                              font=("Arial", 20, "bold"), text_color="white")
         self.lbl_titulo.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -247,7 +247,7 @@ class App(BuscaMixin, NovaApostaMixin, SistemaMixin, ctk.CTk):
         # Logo/Título
         ctk.CTkLabel(scroll, text="🎰",
                        font=("Arial", 80), text_color=Cores.PRIMARIO).pack(pady=(20, 10))
-        ctk.CTkLabel(scroll, text="Loterias da Caixa",
+        ctk.CTkLabel(scroll, text="Controle de Apostas Lotéricas",
                        font=("Arial", 32, "bold"), text_color=Cores.PRIMARIO).pack(pady=(0, 5))
         ctk.CTkLabel(scroll, text="Sistema de Controle de Apostas e Resultados",
                        font=("Arial", 16), text_color="#666").pack(pady=(0, 30))

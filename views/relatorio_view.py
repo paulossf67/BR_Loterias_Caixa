@@ -179,7 +179,7 @@ class RelatorioView:
         resultados = self.controller.get_resultados()
 
         texto = "=" * 60 + "\n"
-        texto += "  RELATÓRIO COMPLETO - LOTERIAS DA CAIXA\n"
+        texto += "  RELATÓRIO COMPLETO - CONTROLE DE APOSTAS LOTÉRICAS\n"
         texto += f"  Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
         texto += "=" * 60 + "\n\n"
 

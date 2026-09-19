@@ -1,6 +1,6 @@
-# 🎰 Sistema de Controle de Apostas e Resultados - Loterias da Caixa
+# 🎰 Controle de Apostas Lotéricas
 
-Sistema de gestão de apostas e resultados das Loterias da Caixa com interface gráfica em Python.
+Sistema de controle de apostas e resultados das loterias da Caixa, com interface gráfica em Python. Não é um produto da Caixa nem faz apostas oficiais.
 
 **Desenvolvido por:** Paulo Sérgio dos Santos Fontes  
 **Telefone:** (79) 98805 6632

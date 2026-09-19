@@ -1,5 +1,5 @@
 """
-Gerador de Boleto de Aposta - Loterias da Caixa
+Gerador de Boleto de Aposta - Controle de Apostas Lotéricas
 Gera um boleto HTML formatado para impressão
 """
 import os
@@ -584,7 +584,7 @@ body {{
             <br>Verifique os resultados em www.loterias.caixa.gov.br
         </div>
         <div class="sistema">
-            Sistema de Controle de Loterias v1.0 - Desenvolvido por Paulo Sergio dos Santos Fontes
+            Controle de Apostas Lotéricas v1.0 - Desenvolvido por Paulo Sergio dos Santos Fontes
         </div>
     </div>
 

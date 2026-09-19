@@ -417,7 +417,7 @@ class ConfigView:
         ).pack(pady=(15, 5), anchor="w", padx=15)
 
         ctk.CTkLabel(
-            frame, text="🎰  Loterias da Caixa",
+            frame, text="🎰  Controle de Apostas Lotéricas",
             font=("Arial", 20, "bold"), text_color=Cores.PRIMARIO,
         ).pack(pady=(10, 2))
 
